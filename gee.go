@@ -19,19 +19,19 @@ func (engine *Engine) addRouter(method string, pattern string, handler HandlerFu
 }
 
 func (engine *Engine) GET(pattern string, handler HandlerFunc) {
-	engine.addRouter("GET", pattern, handler)
+	engine.addRouter(http.MethodGet, pattern, handler)
 }
 
 func (engine *Engine) POST(pattern string, handler HandlerFunc) {
-	engine.addRouter("POST", pattern, handler)
+	engine.addRouter(http.MethodPost, pattern, handler)
 }
 
 func (engine *Engine) PUT(pattern string, handler HandlerFunc) {
-	engine.addRouter("PUT", pattern, handler)
+	engine.addRouter(http.MethodPut, pattern, handler)
 }
 
 func (engine *Engine) DELETE(pattern string, handler HandlerFunc) {
-	engine.addRouter("DELETE", pattern, handler)
+	engine.addRouter(http.MethodDelete, pattern, handler)
 }
 
 func (engine *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {

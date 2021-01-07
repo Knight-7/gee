@@ -1,11 +1,15 @@
 package gee
 
 import (
+	"context"
 	"html/template"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"path"
 	"strings"
+	"time"
 )
 
 type HandlerFunc func(*Context)
@@ -117,6 +121,29 @@ func (engine *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	engine.router.handle(c)
 }
 
-func (engine *Engine) Run(addr string) (err error) {
-	return http.ListenAndServe(addr, engine)
+// Graceful shutdown server
+func (engine *Engine) Run(addr string) {
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: engine,
+	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+
+	quit := make(chan os.Signal)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
+	log.Printf("Shutdown serve...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 5)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Shutdown faild: %s\n", err)
+	}
+	log.Printf("Serve exiting")
 }

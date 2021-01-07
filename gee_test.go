@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func logger(c *Context) {
@@ -55,7 +53,5 @@ func TestGee(t *testing.T) {
 		})
 	}
 
-	if err := engine.Run("localhost:3434"); err != nil {
-		assert.NoError(t, err)
-	}
+	engine.Run(":2020")
 }

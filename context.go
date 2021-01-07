@@ -10,14 +10,19 @@ type H map[string]interface{}
 
 type Context struct {
 	// original obj
-	Write      http.ResponseWriter
-	Req        *http.Request
+	Write http.ResponseWriter
+	Req   *http.Request
 	// request info
-	Path       string
-	Method     string
-	Params     map[string]string
+	Path   string
+	Method string
+	Params map[string]string
 	// response info
 	StatusCode int
+	// middleware
+	handlers []HandlerFunc
+	index    int
+	// engine pointer
+	engine *Engine
 }
 
 func newContext(w http.ResponseWriter, r *http.Request) *Context {
@@ -26,7 +31,20 @@ func newContext(w http.ResponseWriter, r *http.Request) *Context {
 		Req:    r,
 		Path:   r.URL.Path,
 		Method: r.Method,
+		index:  -1,
 	}
+}
+
+func (c *Context) Next() {
+	c.index++
+	for ; c.index < len(c.handlers); c.index++ {
+		c.handlers[c.index](c)
+	}
+}
+
+func (c *Context) Fail(code int, err string) {
+	c.index = len(c.handlers)
+	c.JSON(code, err)
 }
 
 func (c *Context) PostForm(key string) string {
@@ -70,7 +88,10 @@ func (c *Context) Data(code int, data []byte) {
 	_, _ = c.Write.Write(data)
 }
 
-func (c *Context) HTML(code int, html string) {
+func (c *Context) HTML(code int, name string, data interface{}) {
+	c.SetHeader("Content-Type", "text/html")
 	c.Status(code)
-	_, _ = c.Write.Write([]byte(html))
+	if err := c.engine.htmlTemplates.ExecuteTemplate(c.Write, name, data); err != nil {
+		c.Fail(http.StatusInternalServerError, err.Error())
+	}
 }

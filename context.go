@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
 )
 
 type H map[string]interface{}
@@ -12,17 +14,25 @@ type Context struct {
 	// original obj
 	Write http.ResponseWriter
 	Req   *http.Request
+
 	// request info
 	Path   string
 	Method string
 	Params map[string]string
+
 	// response info
 	StatusCode int
+
 	// middleware
 	handlers []HandlerFunc
 	index    int
+
 	// engine pointer
 	engine *Engine
+
+	// context
+	Keys map[string]interface{}
+	mu   sync.RWMutex
 }
 
 func newContext(w http.ResponseWriter, r *http.Request) *Context {
@@ -33,6 +43,36 @@ func newContext(w http.ResponseWriter, r *http.Request) *Context {
 		Method: r.Method,
 		index:  -1,
 	}
+}
+
+func (c *Context) Set(key string, value interface{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.Keys == nil {
+		c.Keys = make(map[string]interface{})
+	}
+	c.Keys[key] = value
+}
+
+func (c *Context) Get(key string) (interface{}, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	value, ok := c.Keys[key]
+	return value, ok
+}
+
+func (c *Context) MustGet(key string) interface{} {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	value, ok := c.Keys[key]
+	if !ok {
+		panic("Key \"" + key + "\" not exists")
+	}
+
+	return value
 }
 
 func (c *Context) Next() {
@@ -94,4 +134,20 @@ func (c *Context) HTML(code int, name string, data interface{}) {
 	if err := c.engine.htmlTemplates.ExecuteTemplate(c.Write, name, data); err != nil {
 		c.Fail(http.StatusInternalServerError, err.Error())
 	}
+}
+
+func (c *Context) Deadline() (deadline time.Time, ok bool) {
+	return
+}
+
+func (c *Context) Done() <-chan struct{} {
+	return nil
+}
+
+func (c *Context) Err() error {
+	return nil
+}
+
+func (c *Context) Value(key interface{}) interface{} {
+	return nil
 }

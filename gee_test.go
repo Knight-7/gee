@@ -18,7 +18,6 @@ func logger(c *Context) {
 func TestGee(t *testing.T) {
 	engine := New()
 	engine.Use(logger)
-
 	v1 := engine.Group("/api/v1")
 	{
 		v1.GET("/user/:id", func(c *Context) {

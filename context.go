@@ -35,14 +35,16 @@ type Context struct {
 	mu   sync.RWMutex
 }
 
-func newContext(w http.ResponseWriter, r *http.Request) *Context {
-	return &Context{
-		Write:  w,
-		Req:    r,
-		Path:   r.URL.Path,
-		Method: r.Method,
-		index:  -1,
-	}
+func (c *Context) reset(w http.ResponseWriter, r *http.Request) {
+	c.Write = w
+	c.Req = r
+	c.Path = c.Req.URL.Path
+	c.Method = c.Req.Method
+	c.Params = nil
+	c.StatusCode = 0
+	c.handlers = nil
+	c.index = -1
+	c.Keys = nil
 }
 
 func (c *Context) Set(key string, value interface{}) {

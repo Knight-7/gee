@@ -7,6 +7,11 @@ import (
 	"path"
 )
 
+type Routers interface {
+	Group(string) Routers
+	Router
+}
+
 type Router interface {
 	Use(...HandlerFunc)
 
@@ -25,7 +30,7 @@ type RouterGroup struct {
 	engine      *Engine
 }
 
-func (group *RouterGroup) Group(prefix string) *RouterGroup {
+func (group *RouterGroup) Group(prefix string) Routers {
 	engine := group.engine
 	newGroup := &RouterGroup{
 		prefix: group.prefix + prefix,

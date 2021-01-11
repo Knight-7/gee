@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// 路由，使用路由树实现
 type router struct {
 	roots    map[string]*node
 	handlers map[string]HandlerFunc

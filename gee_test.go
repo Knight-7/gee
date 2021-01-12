@@ -1,6 +1,7 @@
 package gee
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -75,4 +76,12 @@ func TestGee(t *testing.T) {
 	engine.ServeHTTP(deleteWriter, deleteReq)
 	assert.Equal(t, http.StatusOK, deleteWriter.Code)
 	assert.Equal(t, "34 delete ok\n", deleteWriter.Body.String())
+
+	defer func() {
+		r := recover()
+		assert.Equal(t, fmt.Sprintf("The new path /api/v2/knight is conflict with path /api/v2/:name"), r)
+	}()
+
+	engine.POST("/api/v2/knight", nil)
+	engine.POST("/api/v2/:name", nil)
 }

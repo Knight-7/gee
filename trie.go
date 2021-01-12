@@ -1,6 +1,7 @@
 package gee
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -34,6 +35,9 @@ func (n *node) matchChildren(part string) []*node {
 
 func (n *node) insert(pattern string, parts []string, height int) {
 	if len(parts) == height {
+		if n.pattern != "" {
+			panic(fmt.Sprintf("The new path %s is conflict with path %s", pattern, n.pattern))
+		}
 		n.pattern = pattern
 		return
 	}

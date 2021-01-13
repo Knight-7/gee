@@ -79,9 +79,42 @@ func TestGee(t *testing.T) {
 
 	defer func() {
 		r := recover()
-		assert.Equal(t, fmt.Sprintf("The new path /api/v2/knight is conflict with path /api/v2/:name"), r)
+		assert.Equal(t, fmt.Sprintf("The new path '/api/v2/knight' is conflict with path '/api/v2/:name'"), r)
 	}()
 
-	engine.POST("/api/v2/knight", nil)
 	engine.POST("/api/v2/:name", nil)
+	engine.POST("/api/v2/knight", nil)
+}
+
+func TestRouterConflict(t *testing.T) {
+	defer func() {
+		r := recover()
+		assert.Equal(t, "The new path '/api/v1/user/hello/:name' is conflict with path '/api/v1/user/hello/knight'", r)
+	}()
+
+	engine := Default()
+	v1 := engine.Group("/api/v1")
+	{
+		v1.GET("/user/hello/knight", func(c *Context) {
+			c.String(http.StatusOK, c.Path)
+		})
+		v1.GET("/user/hello/:name/ecs/:id", func(c *Context) {
+			c.String(http.StatusOK, c.Path)
+		})
+		v1.GET("/user/hello/:name/ecs/:id/update", func(c *Context) {
+			c.String(http.StatusOK, c.Path)
+		})
+		v1.GET("/user/hello/:name", func(c *Context) {
+			c.String(http.StatusOK, c.Path)
+		})
+	}
+
+	put1Write := httptest.NewRecorder()
+	put1Req, _ := http.NewRequest(http.MethodGet, "/api/v1/user/hello/knight", nil)
+	engine.ServeHTTP(put1Write, put1Req)
+	put2Write := httptest.NewRecorder()
+	put2Req, _ := http.NewRequest(http.MethodGet, "/api/v1/user/hello/kobe", nil)
+	engine.ServeHTTP(put2Write, put2Req)
+	t.Log(put1Write.Body.String())
+	t.Log(put2Write.Body.String())
 }

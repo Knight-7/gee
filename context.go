@@ -4,9 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 )
+
+var jsonContentType = []string{"application/json; charset=utf-8"}
+var textContentType = []string{"text/plain"}
 
 type H map[string]interface{}
 
@@ -33,6 +37,9 @@ type Context struct {
 	// context
 	Keys map[string]interface{}
 	mu   sync.RWMutex
+
+	// cookie
+	sameSite http.SameSite
 }
 
 func (c *Context) reset(w http.ResponseWriter, r *http.Request) {
@@ -110,14 +117,18 @@ func (c *Context) SetHeader(key, value string) {
 	c.Write.Header().Set(key, value)
 }
 
+func (c *Context) writeContentType(key string, val []string) {
+	c.SetHeader(key, val[0])
+}
+
 func (c *Context) String(code int, format string, values ...interface{}) {
-	c.SetHeader("Content-Type", "text/plain")
+	c.writeContentType("Content-Type", textContentType)
 	c.Status(code)
 	_, _ = c.Write.Write([]byte(fmt.Sprintf(format, values...)))
 }
 
 func (c *Context) JSON(code int, obj interface{}) {
-	c.SetHeader("Content-Type", "application/json")
+	c.writeContentType("Content-Type", jsonContentType)
 	c.Status(code)
 	encoder := json.NewEncoder(c.Write)
 	if err := encoder.Encode(obj); err != nil {
@@ -136,6 +147,39 @@ func (c *Context) HTML(code int, name string, data interface{}) {
 	if err := c.engine.htmlTemplates.ExecuteTemplate(c.Write, name, data); err != nil {
 		c.Fail(http.StatusInternalServerError, err.Error())
 	}
+}
+
+func (c *Context) SetCookie(name string, value string, maxAge int, path, domain string, secure, httpOnly bool) {
+	if path == "" {
+		path = "/"
+	}
+
+	http.SetCookie(c.Write, &http.Cookie{
+		Name:     name,
+		Value:    url.QueryEscape(value),
+		Path:     path,
+		Domain:   domain,
+		MaxAge:   maxAge,
+		SameSite: c.sameSite,
+		Secure:   secure,
+		HttpOnly: httpOnly,
+	})
+}
+
+func (c *Context) Cookie(name string) (string, error) {
+	cookie, err := c.Req.Cookie(name)
+	if err != nil {
+		return "", err
+	}
+
+	val, _ := url.QueryUnescape(cookie.Value)
+
+	return val, nil
+}
+
+// set with cookie
+func (c *Context) SetSameSite(sameSite http.SameSite) {
+	c.sameSite = sameSite
 }
 
 func (c *Context) Deadline() (deadline time.Time, ok bool) {

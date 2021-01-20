@@ -118,3 +118,43 @@ func TestRouterConflict(t *testing.T) {
 	t.Log(put1Write.Body.String())
 	t.Log(put2Write.Body.String())
 }
+
+func TestAddRouter1(t *testing.T) {
+	defer func() {
+		r := recover()
+		assert.Equal(t, "Path must begin with '/'", r)
+	}()
+
+	engine := Default()
+	engine.GET("api/user", nil)
+}
+
+func TestAddRouter2(t *testing.T) {
+	defer func() {
+		r := recover()
+		assert.Equal(t, "Handler can not be nil", r)
+	}()
+
+	engine := Default()
+	engine.GET("/api/v1/user", nil)
+}
+
+func TestAddRouter3(t *testing.T) {
+	defer func() {
+		r := recover()
+		assert.Equal(t, "HTTP method can not be empty", r)
+	}()
+
+	engine := Default()
+	engine.addRouter("", "/api/v1", nil)
+}
+
+func TestEngineRun(t *testing.T) {
+	defer func() {
+		r := recover()
+		assert.Equal(t, "Server address can't be null", r)
+	}()
+
+	engine := Default()
+	engine.Run("")
+}

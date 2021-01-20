@@ -2,6 +2,7 @@ package gee
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -20,7 +21,7 @@ type Engine struct {
 	groups        []*RouterGroup
 	htmlTemplates *template.Template
 	funcMap       template.FuncMap
-	pool           sync.Pool
+	pool          sync.Pool
 }
 
 func New() *Engine {
@@ -65,6 +66,8 @@ func (engine *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Graceful shutdown server
 func (engine *Engine) Run(addr string) {
+	assert1(addr != "", "Server address can't be null")
+
 	srv := &http.Server{
 		Addr:    addr,
 		Handler: engine,
@@ -74,6 +77,7 @@ func (engine *Engine) Run(addr string) {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
+		fmt.Printf("Server listen at %s successfully. Use 'Ctrl + C' to stop Server\n", addr)
 	}()
 
 	quit := make(chan os.Signal)
@@ -81,7 +85,7 @@ func (engine *Engine) Run(addr string) {
 	<-quit
 	log.Printf("Shutdown serve...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {

@@ -34,6 +34,10 @@ func parsePattern(pattern string) []string {
 }
 
 func (r *router) addRouter(method string, pattern string, handler HandlerFunc) {
+	assert1(method != "", "HTTP method can not be empty")
+	assert1(pattern[0] == '/', "Path must begin with '/'")
+	assert1(handler != nil, "Handler can not be nil")
+
 	parts := parsePattern(pattern)
 	key := method + "-" + pattern
 	root, ok := r.roots[method]

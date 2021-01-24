@@ -44,3 +44,8 @@ func TestSetAndGet(t *testing.T) {
 
 	_ = c.MustGet("sdflksjf")
 }
+
+func TestBind(t *testing.T) {
+	engine := setupEngine(t)
+	engine.Run("localhost:2020")
+}

@@ -11,18 +11,44 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type User struct {
+	Name     string `json:"name" form:"name"`
+	Password string `json:"password" form:"password"`
+	Age      int    `json:"age" form:"age"`
+	Male     bool `json:"male" form:"male"`
+}
+
 func setupEngine(t *testing.T) *Engine {
 	engine := Default()
 	v1 := engine.Group("/api/v1")
 	{
 		v1.GET("/user/:id", func(c *Context) {
+			var user User
+			if err := c.Bind(&user); err != nil {
+				c.Fail(http.StatusInternalServerError, err.Error())
+				return
+			}
+
+			fmt.Printf("Form: %v\n", c.Req.Form)
+			fmt.Printf("PostForm: %v\n", c.Req.PostForm)
+			fmt.Printf("MultipartForm: %v\n", c.Req.MultipartForm)
 			id := c.Param("id")
-			c.String(http.StatusOK, "Hello %s\n", id)
+			c.JSON(http.StatusOK, H{
+				"id":   id,
+				"user": user,
+			})
 		})
 		v1.POST("/user", func(c *Context) {
+			var user User
+			err := c.Bind(&user)
+			if err != nil {
+				c.Fail(http.StatusInternalServerError, err.Error())
+				return
+			}
+
 			c.JSON(http.StatusOK, H{
-				"username": c.PostForm("user"),
-				"password": c.PostForm("pass"),
+				"user":         user,
+				"Content-Type": c.ContentType(),
 			})
 		})
 		v1.PUT("/user/:id/update", func(c *Context) {
@@ -72,7 +98,7 @@ func TestGee(t *testing.T) {
 	assert.Equal(t, "34 update ok\n", putWriter.Body.String())
 
 	deleteWriter := httptest.NewRecorder()
-	deleteReq, _:= http.NewRequest(http.MethodDelete, "/api/v1/user/34/delete", nil)
+	deleteReq, _ := http.NewRequest(http.MethodDelete, "/api/v1/user/34/delete", nil)
 	engine.ServeHTTP(deleteWriter, deleteReq)
 	assert.Equal(t, http.StatusOK, deleteWriter.Code)
 	assert.Equal(t, "34 delete ok\n", deleteWriter.Body.String())

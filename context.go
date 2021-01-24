@@ -2,22 +2,30 @@ package gee
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
+
+	"github.com/Knight-7/gee/binding"
 )
 
-var jsonContentType = []string{"application/json; charset=utf-8"}
-var textContentType = []string{"text/plain"}
+var (
+	jsonContentType = []string{"application/json; charset=utf-8"}
+	textContentType = []string{"text/plain; charset=utf-8"}
+	xmlContentType  = []string{"application/xml; charset=utf-8"}
+	yamlContentType = []string{"application/x-yaml; charset=utf-8"}
+)
 
 type H map[string]interface{}
 
 type Context struct {
 	// original obj
-	Write http.ResponseWriter
-	Req   *http.Request
+	Writer http.ResponseWriter
+	Req    *http.Request
 
 	// request info
 	Path   string
@@ -43,7 +51,7 @@ type Context struct {
 }
 
 func (c *Context) reset(w http.ResponseWriter, r *http.Request) {
-	c.Write = w
+	c.Writer = w
 	c.Req = r
 	c.Path = c.Req.URL.Path
 	c.Method = c.Req.Method
@@ -92,8 +100,17 @@ func (c *Context) Next() {
 }
 
 func (c *Context) Fail(code int, err string) {
-	c.index = len(c.handlers)
+	c.Abort()
 	c.JSON(code, err)
+}
+
+func (c *Context) Abort() {
+	c.index = len(c.handlers)
+}
+
+func (c *Context) AbortWithStatus(code int) {
+	c.Status(code)
+	c.Abort()
 }
 
 func (c *Context) PostForm(key string) string {
@@ -110,51 +127,70 @@ func (c *Context) Param(key string) string {
 
 func (c *Context) Status(code int) {
 	c.StatusCode = code
-	c.Write.WriteHeader(code)
+	c.Writer.WriteHeader(code)
 }
 
 func (c *Context) SetHeader(key, value string) {
-	c.Write.Header().Set(key, value)
+	c.Writer.Header().Set(key, value)
 }
 
-func (c *Context) writeContentType(key string, val []string) {
-	c.SetHeader(key, val[0])
+func (c *Context) writeContentType(val []string) {
+	c.SetHeader("Content-Type", val[0])
 }
 
 func (c *Context) String(code int, format string, values ...interface{}) {
-	c.writeContentType("Content-Type", textContentType)
+	c.writeContentType(textContentType)
 	c.Status(code)
-	_, _ = c.Write.Write([]byte(fmt.Sprintf(format, values...)))
+	_, _ = c.Writer.Write([]byte(fmt.Sprintf(format, values...)))
 }
 
 func (c *Context) JSON(code int, obj interface{}) {
-	c.writeContentType("Content-Type", jsonContentType)
+	c.writeContentType(jsonContentType)
 	c.Status(code)
-	encoder := json.NewEncoder(c.Write)
+	encoder := json.NewEncoder(c.Writer)
 	if err := encoder.Encode(obj); err != nil {
-		http.Error(c.Write, err.Error(), http.StatusInternalServerError)
+		http.Error(c.Writer, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (c *Context) XML(code int, obj interface{}) {
+	c.writeContentType(xmlContentType)
+	c.Status(code)
+	encoder := xml.NewEncoder(c.Writer)
+	if err := encoder.Encode(obj); err != nil {
+		http.Error(c.Writer, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (c *Context) YAML(code int, obj interface{}) {
+	c.writeContentType(yamlContentType)
+	c.Status(code)
+	encoder := yaml.NewEncoder(c.Writer)
+	if err := encoder.Encode(obj); err != nil {
+		http.Error(c.Writer, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (c *Context) Data(code int, data []byte) {
 	c.Status(code)
-	_, _ = c.Write.Write(data)
+	_, _ = c.Writer.Write(data)
 }
 
 func (c *Context) HTML(code int, name string, data interface{}) {
 	c.SetHeader("Content-Type", "text/html")
 	c.Status(code)
-	if err := c.engine.htmlTemplates.ExecuteTemplate(c.Write, name, data); err != nil {
+	if err := c.engine.htmlTemplates.ExecuteTemplate(c.Writer, name, data); err != nil {
 		c.Fail(http.StatusInternalServerError, err.Error())
 	}
 }
 
+// TODO: 学习 Golang 中 cookie 的知识和使用方法
 func (c *Context) SetCookie(name string, value string, maxAge int, path, domain string, secure, httpOnly bool) {
 	if path == "" {
 		path = "/"
 	}
 
-	http.SetCookie(c.Write, &http.Cookie{
+	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     name,
 		Value:    url.QueryEscape(value),
 		Path:     path,
@@ -180,6 +216,39 @@ func (c *Context) Cookie(name string) (string, error) {
 // set with cookie
 func (c *Context) SetSameSite(sameSite http.SameSite) {
 	c.sameSite = sameSite
+}
+
+func (c *Context) ContentType() string {
+	return c.Req.Header.Get("Content-Type")
+}
+
+func (c *Context) Bind(obj interface{}) error {
+	b := binding.Default(c.Method, c.ContentType())
+	return c.MustBindWith(obj, b)
+}
+
+func (c *Context) BindJSON(obj interface{}) error {
+	return c.MustBindWith(obj, binding.JSON)
+}
+
+func (c *Context) BindXML(obj interface{}) error {
+	return c.MustBindWith(obj, binding.XML)
+}
+
+func (c *Context) BindYAML(obj interface{}) error {
+	return c.MustBindWith(obj, binding.YAML)
+}
+
+func (c *Context) MustBindWith(obj interface{}, b binding.Binding) error {
+	if err := c.ShouldBindWith(obj, b); err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return err
+	}
+	return nil
+}
+
+func (c *Context) ShouldBindWith(obj interface{}, b binding.Binding) error {
+	return b.Bind(c.Req, obj)
 }
 
 func (c *Context) Deadline() (deadline time.Time, ok bool) {

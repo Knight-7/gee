@@ -21,11 +21,11 @@ var (
 	FormMultipart = multipartBinding{}
 )
 
-type Binding interface {
+type Binder interface {
 	Bind(*http.Request, interface{}) error
 }
 
-func Default(method, contentType string) Binding {
+func Default(method, contentType string) Binder {
 	// 当请求的 Method 是时 GET 时，此时解析的是 URL 上的参数
 	if method == http.MethodGet {
 		return Form

@@ -1,23 +1,13 @@
 package gee
 
 import (
-	"encoding/json"
-	"encoding/xml"
-	"fmt"
-	"gopkg.in/yaml.v3"
+	"github.com/Knight-7/gee/rendering"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
 
 	"github.com/Knight-7/gee/binding"
-)
-
-var (
-	jsonContentType = []string{"application/json; charset=utf-8"}
-	textContentType = []string{"text/plain; charset=utf-8"}
-	xmlContentType  = []string{"application/xml; charset=utf-8"}
-	yamlContentType = []string{"application/x-yaml; charset=utf-8"}
 )
 
 type H map[string]interface{}
@@ -139,41 +129,31 @@ func (c *Context) writeContentType(val []string) {
 }
 
 func (c *Context) String(code int, format string, values ...interface{}) {
-	c.writeContentType(textContentType)
-	c.Status(code)
-	_, _ = c.Writer.Write([]byte(fmt.Sprintf(format, values...)))
+	c.Render(code, rendering.String{Format: format, Value: values})
 }
 
 func (c *Context) JSON(code int, obj interface{}) {
-	c.writeContentType(jsonContentType)
-	c.Status(code)
-	encoder := json.NewEncoder(c.Writer)
-	if err := encoder.Encode(obj); err != nil {
-		http.Error(c.Writer, err.Error(), http.StatusInternalServerError)
-	}
+	c.Render(code, rendering.JSON{Data: obj})
 }
 
 func (c *Context) XML(code int, obj interface{}) {
-	c.writeContentType(xmlContentType)
-	c.Status(code)
-	encoder := xml.NewEncoder(c.Writer)
-	if err := encoder.Encode(obj); err != nil {
-		http.Error(c.Writer, err.Error(), http.StatusInternalServerError)
-	}
+	c.Render(code, rendering.XML{Data: obj})
 }
 
 func (c *Context) YAML(code int, obj interface{}) {
-	c.writeContentType(yamlContentType)
-	c.Status(code)
-	encoder := yaml.NewEncoder(c.Writer)
-	if err := encoder.Encode(obj); err != nil {
-		http.Error(c.Writer, err.Error(), http.StatusInternalServerError)
-	}
+	c.Render(code, rendering.YAML{Data: obj})
 }
 
-func (c *Context) Data(code int, data []byte) {
-	c.Status(code)
-	_, _ = c.Writer.Write(data)
+func (c *Context) Data(code int, contentType string, data []byte) {
+	c.Render(code, rendering.Data{ContentType: contentType, Data: data})
+}
+
+func (c *Context) Redirect(code int, url string) {
+	c.Render(code, rendering.Redirect{
+		Code: code,
+		Location: url,
+		Request: c.Req,
+	})
 }
 
 func (c *Context) HTML(code int, name string, data interface{}) {
@@ -182,6 +162,29 @@ func (c *Context) HTML(code int, name string, data interface{}) {
 	if err := c.engine.htmlTemplates.ExecuteTemplate(c.Writer, name, data); err != nil {
 		c.Fail(http.StatusInternalServerError, err.Error())
 	}
+}
+
+func (c *Context) Render(code int, r rendering.Render) {
+	c.Status(code)
+
+	if !c.bodyCanWriteContentWithStatus(code) {
+		r.WriteContentType(c.Writer)
+		return
+	}
+
+	if err := r.Render(c.Writer); err != nil {
+		panic(err)
+	}
+}
+
+func (c *Context) bodyCanWriteContentWithStatus(code int) bool {
+	switch {
+	case code >= 100 && code <= 199:
+		return false
+	case code == http.StatusNoContent || code == http.StatusNotModified:
+		return false
+	}
+	return true
 }
 
 // TODO: 学习 Golang 中 cookie 的知识和使用方法
@@ -222,6 +225,7 @@ func (c *Context) ContentType() string {
 	return c.Req.Header.Get("Content-Type")
 }
 
+// 数据绑定，支持绑定 URL PostForm MultipartForm JSON XML YAML 的数据
 func (c *Context) Bind(obj interface{}) error {
 	b := binding.Default(c.Method, c.ContentType())
 	return c.MustBindWith(obj, b)
@@ -239,7 +243,11 @@ func (c *Context) BindYAML(obj interface{}) error {
 	return c.MustBindWith(obj, binding.YAML)
 }
 
-func (c *Context) MustBindWith(obj interface{}, b binding.Binding) error {
+func (c *Context) BindURL(obj interface{}) error {
+	return c.MustBindWith(obj, binding.Form)
+}
+
+func (c *Context) MustBindWith(obj interface{}, b binding.Binder) error {
 	if err := c.ShouldBindWith(obj, b); err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return err
@@ -247,7 +255,7 @@ func (c *Context) MustBindWith(obj interface{}, b binding.Binding) error {
 	return nil
 }
 
-func (c *Context) ShouldBindWith(obj interface{}, b binding.Binding) error {
+func (c *Context) ShouldBindWith(obj interface{}, b binding.Binder) error {
 	return b.Bind(c.Req, obj)
 }
 

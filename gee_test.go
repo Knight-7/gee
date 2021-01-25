@@ -72,6 +72,18 @@ func setupEngine(t *testing.T) *Engine {
 			c.String(http.StatusOK, "hello %s", name)
 		})
 	}
+	v3 := engine.Group("/api/v3")
+	{
+		v3.GET("/:name/get", func(c *Context) {
+			fmt.Printf("%v\n", c.Req.URL)
+			fmt.Printf("%v\n", c.Req.RequestURI)
+			c.XML(http.StatusOK, H{
+				"message": "ok",
+				"status": "ok",
+				"length": 100,
+			})
+		})
+	}
 
 	return engine
 }

@@ -12,16 +12,13 @@ type XML struct {
 func (r XML) Render(w http.ResponseWriter) error {
 	r.WriteContentType(w)
 
-	data, err := xml.Marshal(r.Data)
-	if err != nil {
-		return err
-	}
-	_, err = w.Write(data)
-	if err != nil {
+	/*encoder := xml.NewEncoder(w)
+	if err := encoder.Encode(r.Data); err != nil {
 		return err
 	}
 
-	return nil
+	return nil*/
+	return xml.NewEncoder(w).Encode(r.Data)
 }
 
 func (r XML) WriteContentType(w http.ResponseWriter) {

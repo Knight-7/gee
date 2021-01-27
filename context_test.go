@@ -1,6 +1,7 @@
 package gee
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
@@ -45,7 +46,67 @@ func TestSetAndGet(t *testing.T) {
 	_ = c.MustGet("sdflksjf")
 }
 
-func TestBind(t *testing.T) {
-	engine := setupEngine(t)
-	engine.Run("localhost:2020")
+func TestRendering(t *testing.T) {
+	engine := Default()
+	v1 := engine.Group("/api/v1")
+	{
+		v1.GET("/someJSON/:name", func(c *Context) {
+			name := c.Param("name")
+			c.JSON(http.StatusOK, H{
+				"name":         name,
+				"Content-Type": c.ContentType(),
+			})
+		})
+		v1.GET("/someXML/:name", func(c *Context) {
+			name := c.Param("name")
+			c.XML(http.StatusOK, H{
+				"name":         name,
+				"Content-type": c.ContentType(),
+			})
+		})
+		v1.GET("/someYAML/:name", func(c *Context) {
+			name := c.Param("name")
+			c.YAML(http.StatusOK, H{
+				"name":         name,
+				"Content-Type": c.ContentType(),
+			})
+		})
+		v1.GET("/hello/:name/:id", func(c *Context) {
+			name := c.Param("name")
+			id := c.Param("id")
+			c.String(http.StatusOK, "Hello, %s. your id is %s\n", name, id)
+		})
+		v1.GET("/redirect/:name", func(c *Context) {
+			c.Redirect(http.StatusMovedPermanently, "http://www.baidu.com")
+			// c.Status(-1)
+			// http.Redirect(c.Writer, c.Req, "http://www.baidu.com", http.StatusTemporaryRedirect)
+		})
+	}
+	engine.Run(":2020")
+}
+
+// 写法1
+func TestContext_HTML(t *testing.T) {
+	engine := Default()
+	engine.LoadHTMLGlob("testdata/static/*")
+	engine.GET("/index/:name", func(c *Context) {
+		c.HTML(http.StatusOK, "index.html", H{
+			"title": "index title",
+			"body":  fmt.Sprintf("Welcome %s", c.Param("name")),
+		})
+	})
+	engine.Run(":2020")
+}
+
+// 写法2
+func TestContext_HTML2(t *testing.T) {
+	engine := Default()
+	engine.LoadHTMLGlob("testdata/**/*")
+	engine.GET("/index", func(c *Context) {
+		c.HTML(http.StatusOK, "static/hello.html", H{
+			"title": "html title",
+			"name":  "Knight",
+		})
+	})
+	engine.Run(":2020")
 }

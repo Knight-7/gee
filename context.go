@@ -10,8 +10,6 @@ import (
 	"github.com/Knight-7/gee/binding"
 )
 
-type H map[string]interface{}
-
 type Context struct {
 	// original obj
 	Writer http.ResponseWriter
@@ -116,8 +114,10 @@ func (c *Context) Param(key string) string {
 }
 
 func (c *Context) Status(code int) {
-	c.StatusCode = code
-	c.Writer.WriteHeader(code)
+	if code > 0 {
+		c.StatusCode = code
+		c.Writer.WriteHeader(code)
+	}
 }
 
 func (c *Context) SetHeader(key, value string) {
@@ -148,20 +148,21 @@ func (c *Context) Data(code int, contentType string, data []byte) {
 	c.Render(code, rendering.Data{ContentType: contentType, Data: data})
 }
 
-func (c *Context) Redirect(code int, url string) {
-	c.Render(code, rendering.Redirect{
-		Code: code,
-		Location: url,
-		Request: c.Req,
+func (c *Context) Redirect(code int, location string) {
+	c.StatusCode = code
+	c.Render(-1, rendering.Redirect{
+		Code:     code,
+		Location: location,
+		Request:  c.Req,
 	})
 }
 
 func (c *Context) HTML(code int, name string, data interface{}) {
-	c.SetHeader("Content-Type", "text/html")
-	c.Status(code)
-	if err := c.engine.htmlTemplates.ExecuteTemplate(c.Writer, name, data); err != nil {
-		c.Fail(http.StatusInternalServerError, err.Error())
-	}
+	c.Render(code, rendering.HTML{
+		Name:     name,
+		Data:     data,
+		Template: c.engine.htmlTemplates,
+	})
 }
 
 func (c *Context) Render(code int, r rendering.Render) {
@@ -181,7 +182,9 @@ func (c *Context) bodyCanWriteContentWithStatus(code int) bool {
 	switch {
 	case code >= 100 && code <= 199:
 		return false
-	case code == http.StatusNoContent || code == http.StatusNotModified:
+	case code == http.StatusNoContent:
+		return false
+	case  code == http.StatusNotModified:
 		return false
 	}
 	return true

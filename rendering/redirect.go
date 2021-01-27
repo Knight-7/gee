@@ -6,9 +6,9 @@ import (
 )
 
 type Redirect struct {
-	Code int
+	Code     int
 	Location string
-	Request *http.Request
+	Request  *http.Request
 }
 
 func (r Redirect) Render(w http.ResponseWriter) error {

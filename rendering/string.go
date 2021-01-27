@@ -13,7 +13,7 @@ type String struct {
 func (r String) Render(w http.ResponseWriter) error {
 	r.WriteContentType(w)
 
-	formatData := fmt.Sprintf(r.Format, r.Value)
+	formatData := fmt.Sprintf(r.Format, r.Value...)
 	_, err := w.Write([]byte(formatData))
 	if err != nil {
 		return err

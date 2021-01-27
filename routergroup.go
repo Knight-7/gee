@@ -47,7 +47,7 @@ func (group *RouterGroup) Use(middlewares ...HandlerFunc) {
 
 func (group *RouterGroup) addRouter(method string, comp string, handler HandlerFunc) {
 	pattern := group.prefix + comp
-	log.Printf("Router %4s - %s\n", method, pattern)
+	log.Printf("%4s - %s\n", method, pattern)
 	group.engine.router.addRouter(method, pattern, handler)
 }
 
@@ -77,7 +77,7 @@ func (group *RouterGroup) createStaticHandler(relativePath string, fs http.FileS
 			return
 		}
 
-		fileServer.ServeHTTP(c.Write, c.Req)
+		fileServer.ServeHTTP(c.Writer, c.Req)
 	}
 }
 

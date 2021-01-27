@@ -1,19 +1,19 @@
 package gee
 
 import (
-	"encoding/json"
-	"fmt"
+	"github.com/Knight-7/gee/rendering"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
-)
 
-type H map[string]interface{}
+	"github.com/Knight-7/gee/binding"
+)
 
 type Context struct {
 	// original obj
-	Write http.ResponseWriter
-	Req   *http.Request
+	Writer http.ResponseWriter
+	Req    *http.Request
 
 	// request info
 	Path   string
@@ -33,10 +33,13 @@ type Context struct {
 	// context
 	Keys map[string]interface{}
 	mu   sync.RWMutex
+
+	// cookie
+	sameSite http.SameSite
 }
 
 func (c *Context) reset(w http.ResponseWriter, r *http.Request) {
-	c.Write = w
+	c.Writer = w
 	c.Req = r
 	c.Path = c.Req.URL.Path
 	c.Method = c.Req.Method
@@ -85,8 +88,17 @@ func (c *Context) Next() {
 }
 
 func (c *Context) Fail(code int, err string) {
-	c.index = len(c.handlers)
+	c.Abort()
 	c.JSON(code, err)
+}
+
+func (c *Context) Abort() {
+	c.index = len(c.handlers)
+}
+
+func (c *Context) AbortWithStatus(code int) {
+	c.Status(code)
+	c.Abort()
 }
 
 func (c *Context) PostForm(key string) string {
@@ -102,40 +114,152 @@ func (c *Context) Param(key string) string {
 }
 
 func (c *Context) Status(code int) {
-	c.StatusCode = code
-	c.Write.WriteHeader(code)
+	if code > 0 {
+		c.StatusCode = code
+		c.Writer.WriteHeader(code)
+	}
 }
 
 func (c *Context) SetHeader(key, value string) {
-	c.Write.Header().Set(key, value)
+	c.Writer.Header().Set(key, value)
+}
+
+func (c *Context) writeContentType(val []string) {
+	c.SetHeader("Content-Type", val[0])
 }
 
 func (c *Context) String(code int, format string, values ...interface{}) {
-	c.SetHeader("Content-Type", "text/plain")
-	c.Status(code)
-	_, _ = c.Write.Write([]byte(fmt.Sprintf(format, values...)))
+	c.Render(code, rendering.String{Format: format, Value: values})
 }
 
 func (c *Context) JSON(code int, obj interface{}) {
-	c.SetHeader("Content-Type", "application/json")
-	c.Status(code)
-	encoder := json.NewEncoder(c.Write)
-	if err := encoder.Encode(obj); err != nil {
-		http.Error(c.Write, err.Error(), http.StatusInternalServerError)
-	}
+	c.Render(code, rendering.JSON{Data: obj})
 }
 
-func (c *Context) Data(code int, data []byte) {
-	c.Status(code)
-	_, _ = c.Write.Write(data)
+func (c *Context) XML(code int, obj interface{}) {
+	c.Render(code, rendering.XML{Data: obj})
+}
+
+func (c *Context) YAML(code int, obj interface{}) {
+	c.Render(code, rendering.YAML{Data: obj})
+}
+
+func (c *Context) Data(code int, contentType string, data []byte) {
+	c.Render(code, rendering.Data{ContentType: contentType, Data: data})
+}
+
+func (c *Context) Redirect(code int, location string) {
+	c.StatusCode = code
+	c.Render(-1, rendering.Redirect{
+		Code:     code,
+		Location: location,
+		Request:  c.Req,
+	})
 }
 
 func (c *Context) HTML(code int, name string, data interface{}) {
-	c.SetHeader("Content-Type", "text/html")
+	c.Render(code, rendering.HTML{
+		Name:     name,
+		Data:     data,
+		Template: c.engine.htmlTemplates,
+	})
+}
+
+func (c *Context) Render(code int, r rendering.Render) {
 	c.Status(code)
-	if err := c.engine.htmlTemplates.ExecuteTemplate(c.Write, name, data); err != nil {
-		c.Fail(http.StatusInternalServerError, err.Error())
+
+	if !c.bodyCanWriteContentWithStatus(code) {
+		r.WriteContentType(c.Writer)
+		return
 	}
+
+	if err := r.Render(c.Writer); err != nil {
+		panic(err)
+	}
+}
+
+func (c *Context) bodyCanWriteContentWithStatus(code int) bool {
+	switch {
+	case code >= 100 && code <= 199:
+		return false
+	case code == http.StatusNoContent:
+		return false
+	case  code == http.StatusNotModified:
+		return false
+	}
+	return true
+}
+
+// TODO: 学习 Golang 中 cookie 的知识和使用方法
+func (c *Context) SetCookie(name string, value string, maxAge int, path, domain string, secure, httpOnly bool) {
+	if path == "" {
+		path = "/"
+	}
+
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     name,
+		Value:    url.QueryEscape(value),
+		Path:     path,
+		Domain:   domain,
+		MaxAge:   maxAge,
+		SameSite: c.sameSite,
+		Secure:   secure,
+		HttpOnly: httpOnly,
+	})
+}
+
+func (c *Context) Cookie(name string) (string, error) {
+	cookie, err := c.Req.Cookie(name)
+	if err != nil {
+		return "", err
+	}
+
+	val, _ := url.QueryUnescape(cookie.Value)
+
+	return val, nil
+}
+
+// set with cookie
+func (c *Context) SetSameSite(sameSite http.SameSite) {
+	c.sameSite = sameSite
+}
+
+func (c *Context) ContentType() string {
+	return c.Req.Header.Get("Content-Type")
+}
+
+// 数据绑定，支持绑定 URL PostForm MultipartForm JSON XML YAML 的数据
+func (c *Context) Bind(obj interface{}) error {
+	b := binding.Default(c.Method, c.ContentType())
+	return c.MustBindWith(obj, b)
+}
+
+func (c *Context) BindJSON(obj interface{}) error {
+	return c.MustBindWith(obj, binding.JSON)
+}
+
+func (c *Context) BindXML(obj interface{}) error {
+	return c.MustBindWith(obj, binding.XML)
+}
+
+func (c *Context) BindYAML(obj interface{}) error {
+	return c.MustBindWith(obj, binding.YAML)
+}
+
+func (c *Context) BindURL(obj interface{}) error {
+	return c.MustBindWith(obj, binding.Form)
+}
+
+func (c *Context) MustBindWith(obj interface{}, b binding.Binder) error {
+	if err := c.ShouldBindWith(obj, b); err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return err
+	}
+	return nil
+}
+
+func (c *Context) ShouldBindWith(obj interface{}, b binding.Binder) error {
+	return b.Bind(c.Req, obj)
 }
 
 func (c *Context) Deadline() (deadline time.Time, ok bool) {

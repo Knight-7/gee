@@ -6,8 +6,8 @@ import (
 )
 
 type HTML struct {
-	Name   string
-	Data   interface{}
+	Name     string
+	Data     interface{}
 	Template *template.Template
 }
 

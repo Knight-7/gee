@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// 路由，使用路由树实现
+// 路由，使用前缀树树实现
 type router struct {
 	roots    map[string]*node
 	handlers map[string]HandlerFunc
@@ -16,21 +16,6 @@ func newRouter() *router {
 		roots:    make(map[string]*node),
 		handlers: make(map[string]HandlerFunc),
 	}
-}
-
-func parsePattern(pattern string) []string {
-	vs := strings.Split(pattern, "/")
-
-	parts := make([]string, 0)
-	for _, item := range vs {
-		if item != "" {
-			parts = append(parts, item)
-			if item[0] == '*' {
-				break
-			}
-		}
-	}
-	return parts
 }
 
 func (r *router) addRouter(method string, pattern string, handler HandlerFunc) {

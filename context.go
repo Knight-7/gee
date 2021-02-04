@@ -124,7 +124,7 @@ func (c *Context) SetHeader(key, value string) {
 	c.Writer.Header().Set(key, value)
 }
 
-func (c *Context) writeContentType(val []string) {
+func (c *Context) setContentType(val []string) {
 	c.SetHeader("Content-Type", val[0])
 }
 
@@ -166,18 +166,20 @@ func (c *Context) HTML(code int, name string, data interface{}) {
 }
 
 func (c *Context) Render(code int, r rendering.Render) {
-	c.Status(code)
-
 	if !c.bodyCanWriteContentWithStatus(code) {
 		r.WriteContentType(c.Writer)
 		return
 	}
+
+	r.WriteContentType(c.Writer)
+	c.Status(code)
 
 	if err := r.Render(c.Writer); err != nil {
 		panic(err)
 	}
 }
 
+// TODO: 学习 http 状态码
 func (c *Context) bodyCanWriteContentWithStatus(code int) bool {
 	switch {
 	case code >= 100 && code <= 199:

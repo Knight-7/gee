@@ -54,32 +54,30 @@ func TestRendering(t *testing.T) {
 			name := c.Param("name")
 			c.JSON(http.StatusOK, H{
 				"name":         name,
-				"Content-Type": c.ContentType(),
+				"Content-Type": c.Writer.Header().Get("Content-Type"),
 			})
 		})
 		v1.GET("/someXML/:name", func(c *Context) {
 			name := c.Param("name")
 			c.XML(http.StatusOK, H{
 				"name":         name,
-				"Content-type": c.ContentType(),
+				"Content-type": c.Writer.Header().Get("Content-Type"),
 			})
 		})
 		v1.GET("/someYAML/:name", func(c *Context) {
 			name := c.Param("name")
 			c.YAML(http.StatusOK, H{
 				"name":         name,
-				"Content-Type": c.ContentType(),
+				"Content-Type": c.Writer.Header().Get("Content-Type"),
 			})
 		})
-		v1.GET("/hello/:name/:id", func(c *Context) {
+		v1.GET("/hello/:name", func(c *Context) {
 			name := c.Param("name")
-			id := c.Param("id")
-			c.String(http.StatusOK, "Hello, %s. your id is %s\n", name, id)
+			c.String(http.StatusOK, "Hello, %s.\n", name)
 		})
 		v1.GET("/redirect/:name", func(c *Context) {
-			c.Redirect(http.StatusMovedPermanently, "http://www.baidu.com")
-			// c.Status(-1)
-			// http.Redirect(c.Writer, c.Req, "http://www.baidu.com", http.StatusTemporaryRedirect)
+			name := c.Param("name")
+			c.Redirect(http.StatusTemporaryRedirect,  fmt.Sprintf("/api/v1/hello/%s", name))
 		})
 	}
 	engine.Run(":2020")

@@ -1,6 +1,9 @@
 package gee
 
-import "encoding/xml"
+import (
+	"encoding/xml"
+	"strings"
+)
 
 type H map[string]interface{}
 
@@ -28,4 +31,19 @@ func assert1(flag bool, text string) {
 	if !flag {
 		panic(text)
 	}
+}
+
+func parsePattern(pattern string) []string {
+	vs := strings.Split(pattern, "/")
+
+	parts := make([]string, 0)
+	for _, item := range vs {
+		if item != "" {
+			parts = append(parts, item)
+			if item[0] == '*' {
+				break
+			}
+		}
+	}
+	return parts
 }

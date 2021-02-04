@@ -4,7 +4,7 @@ import "net/http"
 
 type Data struct {
 	ContentType string
-	Data []byte
+	Data        []byte
 }
 
 func (r Data) Render(w http.ResponseWriter) error {

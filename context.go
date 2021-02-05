@@ -1,27 +1,31 @@
 package gee
 
 import (
-	"github.com/Knight-7/gee/rendering"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 
+	"github.com/Knight-7/gee/rendering"
 	"github.com/Knight-7/gee/binding"
+)
+
+const (
+	defaultMaxMemory = 32 << 20
 )
 
 type Context struct {
 	// original obj
-	Writer http.ResponseWriter
-	Req    *http.Request
+	Writer  ResponseWriter
+	Request *http.Request
 
 	// request info
 	Path   string
 	Method string
 	Params map[string]string
-
-	// response info
-	StatusCode int
 
 	// middleware
 	handlers []HandlerFunc
@@ -39,12 +43,11 @@ type Context struct {
 }
 
 func (c *Context) reset(w http.ResponseWriter, r *http.Request) {
-	c.Writer = w
-	c.Req = r
-	c.Path = c.Req.URL.Path
-	c.Method = c.Req.Method
+	c.Writer = newResponse(w)
+	c.Request = r
+	c.Path = c.Request.URL.Path
+	c.Method = c.Request.Method
 	c.Params = nil
-	c.StatusCode = 0
 	c.handlers = nil
 	c.index = -1
 	c.Keys = nil
@@ -102,11 +105,11 @@ func (c *Context) AbortWithStatus(code int) {
 }
 
 func (c *Context) PostForm(key string) string {
-	return c.Req.PostFormValue(key)
+	return c.Request.PostFormValue(key)
 }
 
 func (c *Context) Query(key string) string {
-	return c.Req.URL.Query().Get(key)
+	return c.Request.URL.Query().Get(key)
 }
 
 func (c *Context) Param(key string) string {
@@ -115,17 +118,12 @@ func (c *Context) Param(key string) string {
 
 func (c *Context) Status(code int) {
 	if code > 0 {
-		c.StatusCode = code
 		c.Writer.WriteHeader(code)
 	}
 }
 
 func (c *Context) SetHeader(key, value string) {
 	c.Writer.Header().Set(key, value)
-}
-
-func (c *Context) setContentType(val []string) {
-	c.SetHeader("Content-Type", val[0])
 }
 
 func (c *Context) String(code int, format string, values ...interface{}) {
@@ -149,11 +147,10 @@ func (c *Context) Data(code int, contentType string, data []byte) {
 }
 
 func (c *Context) Redirect(code int, location string) {
-	c.StatusCode = code
 	c.Render(-1, rendering.Redirect{
 		Code:     code,
 		Location: location,
-		Request:  c.Req,
+		Request:  c.Request,
 	})
 }
 
@@ -192,6 +189,43 @@ func (c *Context) bodyCanWriteContentWithStatus(code int) bool {
 	return true
 }
 
+func (c *Context) FormFile(filename string) (*multipart.FileHeader, error) {
+	if c.Request.MultipartForm == nil {
+		if err := c.Request.ParseMultipartForm(defaultMaxMemory); err != nil {
+			return nil, err
+		}
+	}
+
+	file, fh, err := c.Request.FormFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	_ = file.Close()
+
+	return fh, err
+}
+
+func (c *Context) SaveFile(file *multipart.FileHeader, dst string) error {
+	src, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, src)
+	return err
+}
+
+func (c *Context) File(filepath string) {
+	http.ServeFile(c.Writer, c.Request, filepath)
+}
+
 // TODO: 学习 Golang 中 cookie 的知识和使用方法
 func (c *Context) SetCookie(name string, value string, maxAge int, path, domain string, secure, httpOnly bool) {
 	if path == "" {
@@ -211,7 +245,7 @@ func (c *Context) SetCookie(name string, value string, maxAge int, path, domain 
 }
 
 func (c *Context) Cookie(name string) (string, error) {
-	cookie, err := c.Req.Cookie(name)
+	cookie, err := c.Request.Cookie(name)
 	if err != nil {
 		return "", err
 	}
@@ -227,7 +261,7 @@ func (c *Context) SetSameSite(sameSite http.SameSite) {
 }
 
 func (c *Context) ContentType() string {
-	return c.Req.Header.Get("Content-Type")
+	return c.Request.Header.Get("Content-Type")
 }
 
 // 数据绑定，支持绑定 URL PostForm MultipartForm JSON XML YAML 的数据
@@ -261,7 +295,7 @@ func (c *Context) MustBindWith(obj interface{}, b binding.Binder) error {
 }
 
 func (c *Context) ShouldBindWith(obj interface{}, b binding.Binder) error {
-	return b.Bind(c.Req, obj)
+	return b.Bind(c.Request, obj)
 }
 
 func (c *Context) Deadline() (deadline time.Time, ok bool) {

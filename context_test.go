@@ -108,3 +108,35 @@ func TestContext_HTML2(t *testing.T) {
 	})
 	engine.Run(":2020")
 }
+
+func TestContext_File(t *testing.T) {
+	engine := Default()
+	v1 := engine.Group("/api/v1")
+	{
+		v1.POST("/upload", func(c *Context) {
+			var user User
+			err := c.Bind(&user)
+			if err != nil {
+				c.Fail(http.StatusInternalServerError, err.Error())
+				return
+			}
+
+			file, err := c.FormFile("file")
+			if err != nil {
+				c.Fail(http.StatusInternalServerError, err.Error())
+				return
+			}
+			err = c.SaveFile(file, file.Filename)
+			if err != nil {
+				c.Fail(http.StatusInternalServerError, err.Error())
+				return
+			}
+			c.JSON(http.StatusOK, user)
+		})
+		v1.GET("/download/*filename", func(c *Context) {
+			filename := c.Param("filename")
+			c.File(filename)
+		})
+	}
+	engine.Run(":2020")
+}

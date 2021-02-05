@@ -29,9 +29,9 @@ func setupEngine(t *testing.T) *Engine {
 				return
 			}
 
-			fmt.Printf("Form: %v\n", c.Req.Form)
-			fmt.Printf("PostForm: %v\n", c.Req.PostForm)
-			fmt.Printf("MultipartForm: %v\n", c.Req.MultipartForm)
+			fmt.Printf("Form: %v\n", c.Request.Form)
+			fmt.Printf("PostForm: %v\n", c.Request.PostForm)
+			fmt.Printf("MultipartForm: %v\n", c.Request.MultipartForm)
 			id := c.Param("id")
 			c.JSON(http.StatusOK, H{
 				"id":   id,
@@ -64,7 +64,7 @@ func setupEngine(t *testing.T) *Engine {
 	v2.Use(func(c *Context) {
 		start := time.Now()
 		c.Fail(http.StatusInternalServerError, "internal server error")
-		log.Printf("[%d] %s in %v\n", c.StatusCode, c.Req.RequestURI, time.Since(start))
+		log.Printf("[%d] %s in %v\n", c.Writer.Status(), c.Request.RequestURI, time.Since(start))
 	})
 	{
 		v2.GET("/hello", func(c *Context) {
@@ -75,8 +75,8 @@ func setupEngine(t *testing.T) *Engine {
 	v3 := engine.Group("/api/v3")
 	{
 		v3.GET("/:name/get", func(c *Context) {
-			fmt.Printf("%v\n", c.Req.URL)
-			fmt.Printf("%v\n", c.Req.RequestURI)
+			fmt.Printf("%v\n", c.Request.URL)
+			fmt.Printf("%v\n", c.Request.RequestURI)
 			c.XML(http.StatusOK, H{
 				"message": "ok",
 				"status": "ok",

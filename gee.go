@@ -16,11 +16,14 @@ import (
 type HandlerFunc func(*Context)
 
 type Engine struct {
+	// 路由
 	*RouterGroup
 	router        *router
 	groups        []*RouterGroup
+	// HTML 渲染
 	htmlTemplates *template.Template
 	funcMap       template.FuncMap
+	// Context 池（减少 GC 带来的消耗）
 	pool          sync.Pool
 }
 

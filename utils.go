@@ -47,3 +47,12 @@ func parsePattern(pattern string) []string {
 	}
 	return parts
 }
+
+func filterContent(contentType string) string {
+	for i, ch := range contentType {
+		if ch == ' ' || ch == ';' {
+			return contentType[:i]
+		}
+	}
+	return contentType
+}

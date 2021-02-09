@@ -80,9 +80,9 @@ func (engine *Engine) Run(addr string) {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
-		fmt.Printf("Server listen at %s successfully. Use 'Ctrl + C' to stop Server\n", addr)
 	}()
 
+	fmt.Printf("\nServer listen at %s successfully. Use 'Ctrl + C' to stop Server\n", addr)
 	quit := make(chan os.Signal)
 	signal.Notify(quit, os.Interrupt)
 	<-quit

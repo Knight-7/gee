@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// 路由，使用前缀树树实现
+// 路由，使用字典树树实现
 type router struct {
 	roots    map[string]*node
 	handlers map[string]HandlerFunc

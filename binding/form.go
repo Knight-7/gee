@@ -39,7 +39,11 @@ func (b formPostBinding) Bind(req *http.Request, obj interface{}) error {
 }
 
 func (b multipartBinding) Bind(req *http.Request, obj interface{}) error {
-	return nil
+	if err := req.ParseMultipartForm(defaultMemory); err != nil {
+		return err
+	}
+
+	return mapForm(obj, req.PostForm)
 }
 
 func mapForm(obj interface{}, form map[string][]string) error {

@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// 字典树
 type node struct {
 	pattern     string  // 待匹配的路由
 	part        string  // 路由的一部分

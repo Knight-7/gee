@@ -120,8 +120,12 @@ func TestGee(t *testing.T) {
 		assert.Equal(t, fmt.Sprintf("The new path '/api/v2/knight' is conflict with path '/api/v2/:name'"), r)
 	}()
 
-	engine.POST("/api/v2/:name", nil)
-	engine.POST("/api/v2/knight", nil)
+	engine.POST("/api/v2/:name", func(c *Context) {
+
+	})
+	engine.POST("/api/v2/knight", func(c *Context) {
+
+	})
 }
 
 func TestRouterConflict(t *testing.T) {

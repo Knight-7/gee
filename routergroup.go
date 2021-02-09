@@ -47,7 +47,7 @@ func (group *RouterGroup) Use(middlewares ...HandlerFunc) {
 
 func (group *RouterGroup) addRouter(method string, comp string, handler HandlerFunc) {
 	pattern := group.prefix + comp
-	log.Printf("%4s - %s\n", method, pattern)
+	log.Printf("%-7s - %s\n", method, pattern)
 	group.engine.router.addRouter(method, pattern, handler)
 }
 

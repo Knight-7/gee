@@ -16,9 +16,15 @@ type Router interface {
 	Use(...HandlerFunc)
 
 	GET(string, HandlerFunc)
+	Header(string, HandlerFunc)
 	POST(string, HandlerFunc)
 	PUT(string, HandlerFunc)
 	DELETE(string, HandlerFunc)
+	Connect(string, HandlerFunc)
+	Options(string, HandlerFunc)
+	Trace(string, HandlerFunc)
+	Patch(string, HandlerFunc)
+	Any(string, HandlerFunc)
 
 	Static(string, string)
 }
@@ -65,6 +71,38 @@ func (group *RouterGroup) PUT(pattern string, handler HandlerFunc) {
 
 func (group *RouterGroup) DELETE(pattern string, handler HandlerFunc) {
 	group.addRouter(http.MethodDelete, pattern, handler)
+}
+
+func (group *RouterGroup) Header(pattern string, handler HandlerFunc) {
+	group.addRouter(http.MethodHead, pattern, handler)
+}
+
+func (group *RouterGroup) Connect(pattern string, handler HandlerFunc) {
+	group.addRouter(http.MethodConnect, pattern, handler)
+}
+
+func (group *RouterGroup) Options(pattern string, handler HandlerFunc) {
+	group.addRouter(http.MethodOptions, pattern, handler)
+}
+
+func (group *RouterGroup) Trace(pattern string, handler HandlerFunc) {
+	group.addRouter(http.MethodTrace, pattern, handler)
+}
+
+func (group *RouterGroup) Patch(pattern string, handler HandlerFunc) {
+	group.addRouter(http.MethodPatch, pattern, handler)
+}
+
+func (group *RouterGroup) Any(pattern string, handler HandlerFunc) {
+	group.GET(pattern, handler)
+	group.Header(pattern, handler)
+	group.POST(pattern, handler)
+	group.PUT(pattern, handler)
+	group.DELETE(pattern, handler)
+	group.Connect(pattern, handler)
+	group.Options(pattern, handler)
+	group.Trace(pattern, handler)
+	group.Patch(pattern, handler)
 }
 
 func (group *RouterGroup) createStaticHandler(relativePath string, fs http.FileSystem) HandlerFunc {

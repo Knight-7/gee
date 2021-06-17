@@ -51,3 +51,34 @@ func TestGetRouter(t *testing.T) {
 	assert.Equal(t, "/hello/user/:id", n5.pattern)
 	assert.Equal(t, map[string]string{"id": "7"}, params)
 }
+
+func handler(c *Context) {
+	// 数据解析和数据库的一些操作
+
+	data := map[string]interface{}{
+		"code":    http.StatusOK,
+		"message": "ok",
+		"data":    nil, // 对应数据的信息，可以是结构体struct、数组、字符串等任意格式
+	}
+
+	c.JSON(http.StatusOK, data)
+}
+
+func t() {
+	app := Default()
+
+	app.GET("/hello", func(c *Context) {
+		c.String(http.StatusOK, "Hello World")
+	})
+	app.Header("/hello", nil)
+	app.POST("/hello", nil)
+	app.PUT("/hello", nil)
+	app.DELETE("/hello", nil)
+	app.Connect("/hello", nil)
+	app.Options("/hello", nil)
+	app.Trace("/hello", nil)
+	app.Patch("/hello", nil)
+	app.Any("/hello", nil)
+
+	app.Run(":8080")
+}

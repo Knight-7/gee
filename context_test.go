@@ -113,28 +113,26 @@ func TestContext_File(t *testing.T) {
 	engine := Default()
 	v1 := engine.Group("/api/v1")
 	{
+		// 文件上传
 		v1.POST("/upload", func(c *Context) {
-			var user User
-			err := c.Bind(&user)
+			fileHeader, err := c.FormFile("file")
 			if err != nil {
 				c.Fail(http.StatusInternalServerError, err.Error())
 				return
 			}
-
-			file, err := c.FormFile("file")
+			err = c.SaveFile(fileHeader, fileHeader.Filename)
 			if err != nil {
 				c.Fail(http.StatusInternalServerError, err.Error())
 				return
 			}
-			err = c.SaveFile(file, file.Filename)
-			if err != nil {
-				c.Fail(http.StatusInternalServerError, err.Error())
-				return
-			}
-			c.JSON(http.StatusOK, user)
+			c.JSON(http.StatusOK, nil)
 		})
+
+		// 文件下载
 		v1.GET("/download/*filename", func(c *Context) {
 			filename := c.Param("filename")
+			filename = fmt.Sprintf("testdata/static/%s", filename)
+			fmt.Println(filename)
 			c.File(filename)
 		})
 	}

@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// 字典树
+// Trie树
 type node struct {
 	pattern     string  // 待匹配的路由
 	part        string  // 路由的一部分
@@ -13,10 +13,11 @@ type node struct {
 	isEnd       bool    // 判断该节点是否是终结点
 	childHasEnd bool    // 判断子节点中是否包含终终结点
 	isWild      bool    // 是否精确匹配，包含 '*' 或 ':' 时为 true
+	middlewares []HandlerFunc
 }
 
 // 查找子节点中第一个终结点，用于插入时路由冲突
-func (n *node) findFirstEndChild () *node {
+func (n *node) findFirstEndChild() *node {
 	for _, child := range n.children {
 		if child.isEnd {
 			return child

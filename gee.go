@@ -27,6 +27,22 @@ type Engine struct {
 	pool          sync.Pool
 }
 
+func (engine *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var middlewares []HandlerFunc
+	for _, group := range engine.groups {
+		if strings.HasPrefix(r.URL.Path, group.prefix) {
+			middlewares = append(middlewares, group.middlewares...)
+		}
+	}
+
+	c := engine.pool.Get().(*Context)
+	c.reset(w, r)
+	c.middlewares = middlewares
+	engine.router.handle(c)
+
+	engine.pool.Put(c)
+}
+
 func New() *Engine {
 	engine := &Engine{router: newRouter()}
 	engine.RouterGroup = &RouterGroup{engine: engine}
@@ -39,7 +55,7 @@ func New() *Engine {
 
 func Default() *Engine {
 	engine := New()
-	engine.Use(Logger(), Recovery())
+	engine.Use(Recovery())
 	return engine
 }
 
@@ -51,23 +67,7 @@ func (engine *Engine) LoadHTMLGlob(pattern string) {
 	engine.htmlTemplates = template.Must(template.New("").Funcs(engine.funcMap).ParseGlob(pattern))
 }
 
-func (engine *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var middlewares []HandlerFunc
-	for _, group := range engine.groups {
-		if strings.HasPrefix(r.URL.Path, group.prefix) {
-			middlewares = append(middlewares, group.middlewares...)
-		}
-	}
-
-	c := engine.pool.Get().(*Context)
-	c.reset(w, r)
-	c.handlers = middlewares
-	engine.router.handle(c)
-
-	engine.pool.Put(c)
-}
-
-// Graceful shutdown server
+// Run Graceful shutdown server
 func (engine *Engine) Run(addr string) {
 	assert1(addr != "", "Server address can't be null")
 
@@ -82,7 +82,7 @@ func (engine *Engine) Run(addr string) {
 		}
 	}()
 
-	fmt.Printf("\nServer listen at %s successfully. Use 'Ctrl + C' to stop Server\n", addr)
+	fmt.Printf("\nServer listen at %s successfully. Use 'Ctrl + C' to stop Server\n\n", addr)
 	quit := make(chan os.Signal)
 	signal.Notify(quit, os.Interrupt)
 	<-quit
